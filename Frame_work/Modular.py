@@ -1,5 +1,6 @@
 from Token import Token, Route,Data_Package
 import queue
+import random
 from itertools import combinations, permutations
 from tqdm import tqdm
 
@@ -9,11 +10,22 @@ class Modular:
         self.require_list = {}
         self.output_list = {}
         self.current_time_mark = 0
+        self.prev_avail_mod_list = []
+        self.next_avail_mod_list = []
+    
     def compute(self,dp_list):
         print(f'{self.id} complete computing')
         datapackage = Data_Package(self.current_time_mark,0,self.id)
         
         return datapackage
+    
+    def set_next_avail_mod_list(self, mod_list):
+        self.next_avail_mod_list = mod_list
+        return
+    
+    def set_prev_avail_mod_list(self, mod_list):
+        self.prev_avail_mod_list = mod_list
+        return 
     
     #如果当前tk为请求，则执行如下操作
     def receive_request(self,tk:Token):
@@ -38,7 +50,7 @@ class Modular:
                 token_queue.put(tk)
         return token_queue
 
-    def recieve_reply(self,tk:Token):
+    def receive_reply(self,tk:Token):
         #如果当前令牌为回复，则执行如下操作
         #根据令牌effector_id，找到对应等待数据包索引
         #将根据令牌与等待数据包的source，将令牌中的内容放入等待数据包
@@ -62,21 +74,55 @@ class Modular:
         if tk.message.content == None:
             token_queue = self.receive_request(tk)
         else:
-            token_queue = self.recieve_reply(tk)
+            token_queue = self.receive_reply(tk)
 
         return token_queue
         
 class Modularized_Multiscale_Liquid_State_Machine():
-    def __init__(self,modulars,pertrons_id,reserviors_id,effectors_id):
-        self.modulars = modulars
-        self.mod_dict = {mod.id: mod for mod in modulars}
+    def __init__(self, effectors, reserviors, pertrons):
+        self.modulars = effectors + reserviors + pertrons
+        self.mod_dict = {mod.id: mod for mod in self.modulars}
         #在这里停顿，将effector与pertron分离，只在mmlsm内部循环找路
-        self.pertrons_id = pertrons_id
-        self.reservior_id = reserviors_id
-        self.effector_id = effectors_id
+        self.pertrons_id = [pertron.id for pertron in pertrons]
+        self.reservior_id = [reservior.id for reservior in reserviors]
+        self.effector_id = [effector.id for effector in effectors]
+        self.effectors = effectors
+        self.reserviors = reserviors
+        self.pertrons = pertrons
 
     def get_modular_id(self,layer_index, branch_index):
         return self.modulars[layer_index*self.layer_num+branch_index].id
+    
+    def set_network_structure(self, layer_num=3):
+        self._layer_num = layer_num
+        self._layer_id_map = {}
+        offset = 0
+        for i in range(len(self.effectors)):
+            self.effectors[i].set_next_avail_mod_list(self.reserviors[offset:offset+layer_num])
+            
+        for i in range(0, layer_num):
+            if i == 0:
+                for j in range(len(self.reserviors[offset:offset+layer_num])):
+                    self.reserviors[offset:offset+layer_num][j].set_prev_avail_mod_list(self.effectors)
+                    next_offset = offset+1
+                    self.reserviors[offset:offset+layer_num][j].set_next_avail_mod_list(self.reserviors[next_offset:next_offset+layer_num])
+            elif i == layer_num - 1:
+                for j in range(len(self.reserviors[offset:offset+layer_num])):
+                    prev_offset = offset-1
+                    self.reserviors[offset:offset+layer_num][j].set_prev_avail_mod_list(self.reserviors[prev_offset:prev_offset+layer_num])
+                    self.reserviors[offset:offset+layer_num][j].set_next_avail_mod_list(self.pertrons)
+            else:
+                for j in range(len(self.reserviors[offset:offset+layer_num])):
+                    prev_offset = offset-1
+                    self.reserviors[offset:offset+layer_num][j].set_prev_avail_mod_list(self.reserviors[prev_offset:prev_offset+layer_num])
+                    next_offset = offset+1
+                    self.reserviors[offset:offset+layer_num][j].set_next_avail_mod_list(self.reserviors[next_offset:next_offset+layer_num])
+            
+            self._layer_id_map[i] = self.reservior_id[offset:offset+layer_num]
+            offset += layer_num
+        
+        for i in range(len(self.pertrons)):
+            self.pertrons[i].set_prev_avail_mod_list(self.reserviors[layer_num-1:layer_num-1+layer_num])
     
     def has_modular(self,modular_id):
         for mod in self.modulars:
@@ -89,8 +135,39 @@ class Modularized_Multiscale_Liquid_State_Machine():
             if not self.has_modular(mod_id):
                 return False
         return True
+    
+    def get_random_candidates_routes(self, root_nood_id, leaf_nood_id_list, sample_count=2):
+        if not self.has_modular(root_nood_id):
+            raise ValueError("Root node must be in the list of nodes.")
+        if not self.has_modulars(leaf_nood_id_list):
+            print(leaf_nood_id_list)
+            print(self.mod_dict.keys())
+            raise ValueError("Leaf node must be in the list of nodes.")
+        route = Route(root_nood_id)
+        previous_layer = []
+        layer_index = 0
+        while layer_index < self._layer_num:
+            current_layer = set()
+            if layer_index == 0:
+                sampled_nodes = random.sample(self._layer_id_map[layer_index], sample_count)
+                for node_id in sampled_nodes:
+                    route.add_link(root_nood_id, node_id)
+                    current_layer.add(node_id)
+            else:
+                for pre_node_id in previous_layer:
+                    sampled_nodes = random.sample(self._layer_id_map[layer_index], sample_count)
+                    for node_id in sampled_nodes:
+                        route.add_link(pre_node_id, node_id)
+                        current_layer.add(node_id)
+            layer_index+=1
+            previous_layer=list(current_layer)
+        
+        for end_node_id in leaf_nood_id_list:
+            for node_id in previous_layer:
+                route.add_link(node_id, end_node_id)
+        return route
             
-    def get_candidates_routes(self,root_nood_id,leaf_nood_id_list):
+    def get_candidates_routes(self,root_nood_id, leaf_nood_id_list):
         '''
         根节点为effector，中间节点随机连接，叶节点根据leaf——nood给出
         '''
@@ -122,7 +199,7 @@ class Modularized_Multiscale_Liquid_State_Machine():
                 if valid_graph:
                     reachable_nodes = set()
                     leaves = set()
-                    def dfs_iterative(start_node,leaf_queue:queue.Queue):
+                    def dfs_iterative(start_node):
                         stack = [start_node]
                         while stack:
                             node = stack.pop()
@@ -145,6 +222,7 @@ class Modularized_Multiscale_Liquid_State_Machine():
                             return random.sample(all_subgraphs,2)
         print('get all candidates')
         return all_subgraphs
+    
     def connect_nodes_to_leaf(route, node_list):
         import random
         """
@@ -178,7 +256,7 @@ class Modularized_Multiscale_Liquid_State_Machine():
                 leaf_nodes.append(leaf_node)  # 恢复叶节点
                 leaf_nodes.remove(node)  # 删除新叶节点
                 continue
-
         return route
-    def receive_token(self,tk:Token,current_time_mark):
+    
+    def receive_token(self, tk:Token, current_time_mark):
         self.mod_dict[tk.route.root_node_id].receive_token(tk,current_time_mark)
