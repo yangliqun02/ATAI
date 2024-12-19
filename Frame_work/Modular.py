@@ -49,10 +49,7 @@ class Modular:
         #检查当前是否存在可以直接返回的结果，如果有，检查是否超时，如果未超时，则返回，否则删除该键值
         if tk.effector_id in self.output_list:
             datapackage = self.output_list[tk.effector_id]
-            if len(self.prev_avail_mod_map) == 0:
-                print(f"{tk.effector_id} success!!!")
-                return
-            if datapackage.check_fresh(tk.message.time_mark):
+            if datapackage.check_fresh(tk.message.time_mark) and len(self.prev_avail_mod_map) != 0:
                 source_id = tk.message.source
                 request_time_mark = tk.request_time_mark
                 tk = Token(tk.effector_id,self.current_time_mark,tk.route,self.id,datapackage.content)
@@ -61,7 +58,11 @@ class Modular:
                 self.set_token_to_pre_node_queue(source_id, tk)
                 self.prev_avail_mod_map[source_id].receive_Token(tk)
                 return
+            elif datapackage.check_fresh(tk.message.time_mark) and len(self.prev_avail_mod_map) == 0:
+                print(f"{tk.effector_id} success!!!")
+                return
             else:
+                print("delete!!!")
                 del self.output_list[tk.effector_id]
                 for node_id in tk.route.map[self.id]:
                     new_tk = Token(tk.effector_id,self.current_time_mark,tk.route,self.id,None)
@@ -107,7 +108,7 @@ class Modular:
             get_one = False
             if tk.effector_id in self.compute_queue_map[node_id]:
                 index = 0
-                max_int = max(self.compute_queue_map[node_id][tk.effector_id].qsize(), max_qsize)
+                max_int = min(self.compute_queue_map[node_id][tk.effector_id].qsize(), max_qsize)
                 while index < max_int:
                     node_tk = self.compute_queue_map[node_id][tk.effector_id].get()
                     if node_tk.request_time_mark == tk.request_time_mark:
@@ -130,7 +131,7 @@ class Modular:
             
             index = 0
             get_one = False
-            max_int = max(self.task_queue_map[tk.effector_id].qsize(), max_qsize)
+            max_int = min(self.task_queue_map[tk.effector_id].qsize(), max_qsize)
             while index < max_int:
                 task_tk = self.task_queue_map[tk.effector_id].get()
                 if task_tk.request_time_mark == tk.request_time_mark:

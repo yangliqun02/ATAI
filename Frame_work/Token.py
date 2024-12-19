@@ -150,7 +150,7 @@ class Data_Package():
         self.content = content
         self.time_mark = time_mark
         self.source = source
-    def check_fresh(self,time_mark:int,tolerance = 9):
+    def check_fresh(self,time_mark:int,tolerance = 1):
         return pow(self.time_mark-time_mark,2)<tolerance
 class Token:
     def __init__(self, effector_id, time_mark,route:Route,source,content):
