@@ -1,6 +1,8 @@
 from Token import Token, Route,Data_Package
 import queue
+from queue import PriorityQueue, Queue
 import random
+import datetime
 from itertools import combinations, permutations
 from tqdm import tqdm
 
@@ -10,67 +12,145 @@ class Modular:
         self.require_list = {}
         self.output_list = {}
         self.current_time_mark = 0
-        self.prev_avail_mod_list = []
-        self.next_avail_mod_list = []
+        self.prev_avail_mod_map = {}
+        self.next_avail_mod_map = {}
+        self.task_queue_map = {}
+        self.compute_queue_map = {}
     
-    def compute(self,dp_list):
+    def compute(self, dp_list):
         print(f'{self.id} complete computing')
         datapackage = Data_Package(self.current_time_mark,0,self.id)
-        
         return datapackage
     
+    def set_compute_queue_map(self, node_id):
+        self.compute_queue_map[node_id] = {}
+    
     def set_next_avail_mod_list(self, mod_list):
-        self.next_avail_mod_list = mod_list
+        self.next_avail_mod_map = {module.id: module for module in mod_list}
         return
     
     def set_prev_avail_mod_list(self, mod_list):
-        self.prev_avail_mod_list = mod_list
+        self.prev_avail_mod_map = {module.id: module for module in mod_list}
+        return
+    
+    def add_token_to_queue_map(self, task_queue_map, token: Token):
+        if token.effector_id in task_queue_map:
+            task_queue_map[token.effector_id].put(token)
+        else:
+            task_queue_map[token.effector_id] = Queue()
+            task_queue_map[token.effector_id].put(token)
         return 
+    
+    def set_token_to_pre_node_queue(self, node_id, tk: Token):
+        if node_id in self.prev_avail_mod_map:
+            self.add_token_to_queue_map(self.prev_avail_mod_map[node_id].compute_queue_map[self.id], tk)
     
     #如果当前tk为请求，则执行如下操作
     def receive_request(self,tk:Token):
-        token_queue = queue.Queue()
         #检查当前是否存在可以直接返回的结果，如果有，检查是否超时，如果未超时，则返回，否则删除该键值
         if tk.effector_id in self.output_list:
             datapackage = self.output_list[tk.effector_id]
             if datapackage.check_fresh(tk.message.time_mark):
+                source_id = tk.message.source
+                request_time_mark = tk.request_time_mark
                 tk = Token(tk.effector_id,self.current_time_mark,Route(tk.message.source),self.id,datapackage.content)
-                token_queue.put(tk)
+                tk.set_request_time_mark(request_time_mark)
+                # add result token & notify
+                self.set_token_to_pre_node_queue(source_id, tk)
+                self.prev_avail_mod_map[source_id].receive_Token(tk)
+                return
             else:
                 del self.output_list[tk.effector_id]
-        #否则执行如下操作
+                for node_id in tk.route.map[self.id]:
+                    new_tk = tk.copy()
+                    new_tk.message.time_mark = self.current_time_mark
+                    new_tk.message.source = self.id
+                    # add task token & notify
+                    self.add_token_to_queue_map(self.next_avail_mod_map[node_id].task_queue_map, new_tk)
+                    self.next_avail_mod_map[node_id].receive_Token(new_tk)
+                return
+        #否则执行如下操作                              
         #首先从tk路线图获取当前请求的子节点信息，包含子节点id以及子节点子路由图
         #创建等待数据包，
         #创建请求令牌
+        elif len(self.next_avail_mod_map) == 0:
+            datapackage = self.get_percepted_data()
+            source_id = tk.message.source
+            request_time_mark = tk.request_time_mark
+            tk = Token(tk.effector_id,self.current_time_mark,Route(tk.message.source),self.id,datapackage.content)
+            tk.set_request_time_mark(request_time_mark)
+            # add result token & notify
+            self.set_token_to_pre_node_queue(source_id, tk)
+            self.prev_avail_mod_map[source_id].receive_Token(tk)
+            return
         else:
-            child_node_ids,child_node_subgraph = tk.route.get_child_node(self.id)
-            for cn_id,cn_subgraph in zip(child_node_ids,child_node_subgraph):
-                self.require_list[tk.effector_id].append(Data_Package(self.current_time_mark,None,cn_id))
-                tk = Token(tk.effector_id,self.current_time_mark,cn_subgraph,self.id,None)
-                token_queue.put(tk)
-        return token_queue
-
-    def receive_reply(self,tk:Token):
+            for node_id in tk.route.map[self.id]:
+                new_tk = tk.copy()
+                new_tk.message.time_mark = self.current_time_mark
+                new_tk.message.source = self.id
+                # add task token & notify
+                print("tk: ",new_tk.message.source, node_id, self.next_avail_mod_map[node_id].id)
+                self.add_token_to_queue_map(self.next_avail_mod_map[node_id].task_queue_map, new_tk)
+                self.next_avail_mod_map[node_id].receive_Token(new_tk)
+            return
+        
+    def receive_reply(self,tk:Token, max_qsize=5):  
         #如果当前令牌为回复，则执行如下操作
         #根据令牌effector_id，找到对应等待数据包索引
         #将根据令牌与等待数据包的source，将令牌中的内容放入等待数据包
         #判断当前等待数据包是否已经完整可以计算
-        token_queue = queue.Queue()
+        
         get_all_requirements = True
-        for datapackage in self.require_list[tk.effector_id]:
-            if datapackage.source == tk.message.source:
-                datapackage.content = tk.message.content
-            elif datapackage.content == None:
-                get_all_requirements = False
+        require_list = {}
+        for node_id in tk.route.map[self.id]:
+            index = 0
+            max_int = max(self.compute_queue_map[tk.effector_id][node_id].qsize(), max_qsize)
+            get_one = False
+            while index < max_int:
+                node_tk = self.compute_queue_map[tk.effector_id][node_id].get()
+                if node_tk.request_time_mark == tk.request_time_mark:
+                    get_one = True
+                    require_list[node_id] = node_tk
+                    break
+                else:
+                    # put back
+                    self.compute_queue_map[tk.effector_id][node_id].put(node_tk)
+                index += 1
+            get_all_requirements = (get_all_requirements and get_one)
         
         if get_all_requirements:
-            datapackage = self.compute(self.require_list[tk.effector_id])
-            tk = Token(tk.effector_id,self.current_time_mark,Route(tk.message.source),self.id,datapackage.content)
-            token_queue.put(tk)
-        return token_queue
+            datapackage = self.compute(require_list)
+            self.output_list[tk.effector_id] = datapackage
+            # request_time_mark = tk.request_time_mark
+            
+            index = 0
+            max_int = max(self.task_queue_map[tk.effector_id].qsize(), max_qsize)
+            get_one = False
+            while index < max_int:
+                task_tk = self.task_queue_map[tk.effector_id].get()
+                if task_tk.request_time_mark == tk.request_time_mark:
+                    get_one = True
+                    if len(self.prev_avail_mod_map) == 0:
+                        print(f"{tk.effector_id} success!!!")
+                        break
+                    # trigger second request success
+                    new_tk = task_tk.copy()
+                    new_tk.message.time_mark = self.current_time_mark
+                    print("self receive")
+                    print(new_tk.message.source, self.id)
+                    self.receive_Token(new_tk)
+                    break
+                else:
+                    # not right put back
+                    self.task_queue_map[tk.effector_id].put(task_tk)
+                index+=1
+        else:
+            for id, item in require_list.items():
+                self.compute_queue_map[tk.effector_id][id].put(item)
+        return
 
-    def receive_Token(self,tk:Token,current_time_mark):
-        self.current_time_mark = current_time_mark
+    def receive_Token(self,tk:Token):
+        self.current_time_mark = datetime.datetime.now().timestamp()
         if tk.message.content == None:
             token_queue = self.receive_request(tk)
         else:
@@ -97,32 +177,41 @@ class Modularized_Multiscale_Liquid_State_Machine():
         self._layer_num = layer_num
         self._layer_id_map = {}
         offset = 0
+        layer_size = int(len(self.reserviors) / layer_num)
         for i in range(len(self.effectors)):
-            self.effectors[i].set_next_avail_mod_list(self.reserviors[offset:offset+layer_num])
+            self.effectors[i].set_next_avail_mod_list(self.reserviors[offset:offset+layer_size])
+            for node_id in self.reservior_id[offset:offset+layer_size]:
+                self.effectors[i].set_compute_queue_map(node_id)
             
         for i in range(0, layer_num):
             if i == 0:
-                for j in range(len(self.reserviors[offset:offset+layer_num])):
-                    self.reserviors[offset:offset+layer_num][j].set_prev_avail_mod_list(self.effectors)
-                    next_offset = offset+1
-                    self.reserviors[offset:offset+layer_num][j].set_next_avail_mod_list(self.reserviors[next_offset:next_offset+layer_num])
+                for j in range(len(self.reserviors[offset:offset+layer_size])):
+                    self.reserviors[offset:offset+layer_size][j].set_prev_avail_mod_list(self.effectors)
+                    next_offset = offset+layer_size
+                    self.reserviors[offset:offset+layer_size][j].set_next_avail_mod_list(self.reserviors[next_offset:next_offset+layer_size])
+                    for node_id in self.reservior_id[next_offset:next_offset+layer_size]:
+                        self.reserviors[offset:offset+layer_size][j].set_compute_queue_map(node_id)
             elif i == layer_num - 1:
-                for j in range(len(self.reserviors[offset:offset+layer_num])):
-                    prev_offset = offset-1
-                    self.reserviors[offset:offset+layer_num][j].set_prev_avail_mod_list(self.reserviors[prev_offset:prev_offset+layer_num])
-                    self.reserviors[offset:offset+layer_num][j].set_next_avail_mod_list(self.pertrons)
+                for j in range(len(self.reserviors[offset:offset+layer_size])):
+                    prev_offset = offset-layer_size
+                    self.reserviors[offset:offset+layer_size][j].set_prev_avail_mod_list(self.reserviors[prev_offset:prev_offset+layer_size])
+                    self.reserviors[offset:offset+layer_size][j].set_next_avail_mod_list(self.pertrons)
+                    for node_id in self.pertrons_id:
+                        self.reserviors[offset:offset+layer_size][j].set_compute_queue_map(node_id)
             else:
-                for j in range(len(self.reserviors[offset:offset+layer_num])):
-                    prev_offset = offset-1
-                    self.reserviors[offset:offset+layer_num][j].set_prev_avail_mod_list(self.reserviors[prev_offset:prev_offset+layer_num])
-                    next_offset = offset+1
-                    self.reserviors[offset:offset+layer_num][j].set_next_avail_mod_list(self.reserviors[next_offset:next_offset+layer_num])
+                for j in range(len(self.reserviors[offset:offset+layer_size])):
+                    prev_offset = offset-layer_size
+                    self.reserviors[offset:offset+layer_size][j].set_prev_avail_mod_list(self.reserviors[prev_offset:prev_offset+layer_size])
+                    next_offset = offset+layer_size
+                    self.reserviors[offset:offset+layer_size][j].set_next_avail_mod_list(self.reserviors[next_offset:next_offset+layer_size])
+                    for node_id in self.reservior_id[next_offset:next_offset+layer_size]:
+                        self.reserviors[offset:offset+layer_size][j].set_compute_queue_map(node_id)
             
-            self._layer_id_map[i] = self.reservior_id[offset:offset+layer_num]
-            offset += layer_num
-        
+            self._layer_id_map[i] = self.reservior_id[offset:offset+layer_size]
+            offset += layer_size
+        print(self._layer_id_map)
         for i in range(len(self.pertrons)):
-            self.pertrons[i].set_prev_avail_mod_list(self.reserviors[layer_num-1:layer_num-1+layer_num])
+            self.pertrons[i].set_prev_avail_mod_list(self.reserviors[offset-layer_size:offset])
     
     def has_modular(self,modular_id):
         for mod in self.modulars:

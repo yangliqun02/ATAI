@@ -13,12 +13,16 @@ class Effector(mod):
     def connect_to_state_machine(self, mmlsm: mmlsm):
         self.mmlsm = mmlsm
         
+    def set_compute_queue_map(self, node_id):
+        super(Effector, self).set_compute_queue_map(node_id)
+        return
+        
     def set_next_avail_mod_list(self, mod_list):
-        self.next_avail_mod_list = mod_list
+        super(Effector, self).set_next_avail_mod_list(mod_list)
         return
     
     def set_prev_avail_mod_list(self, mod_list):
-        self.prev_avail_mod_list = mod_list
+        super(Effector, self).set_prev_avail_mod_list(mod_list)
         return 
     
     def receive_reply(self,tk: Token):

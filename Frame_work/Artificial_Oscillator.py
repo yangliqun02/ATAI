@@ -20,7 +20,7 @@ class router():
     def __init__(self):
         self.route_dict = {}
     def get_route(self,effector_id):
-        assert self.route_dict[effector_id] == None, 'illigel effector_id, try to insert and init the route'
+        assert self.route_dict[effector_id] != None, 'illigel effector_id, try to insert and init the route'
         return self.route_dict[effector_id].copy()
     def add_route(self,effector_id,route):
         # print(effector_id, self.route_dict.keys())
@@ -35,15 +35,17 @@ class artificial_oscillator():
         self.effector = effector_modular
     
     def create_token(self, time_mark):
-        effector_id = clock.alarm()
+        effector_id = self.clock.effector_id
         route = self.router.get_route(effector_id)
         source = effector_id
-        return Token(effector_id, time_mark, route, source, None)
+        tk = Token(effector_id, time_mark, route, source, None)
+        tk.set_request_time_mark(time_mark)
+        return tk
     
     def run(self, current_time_mark,tk:Token):
         if tk == None:
-            new_token = self.create_token(self, current_time_mark)
-            return self.effector.receive_Token(new_token,current_time_mark)
+            new_token = self.create_token(current_time_mark)
+            return self.effector.receive_Token(new_token)
         else:
             print(f'get {tk.effector_id}: {tk.message.time_mark} feedback')
             return None 

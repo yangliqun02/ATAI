@@ -32,6 +32,13 @@ class Route:
         dfs(root)
 
         return subgraph
+    
+    def copy(self):
+        # Create a shallow copy
+        cls = self.__class__
+        other = cls.__new__(cls)
+        other.__dict__.update(self.__dict__)
+        return other
 
     def has_cycle(self):
         visited = set()
@@ -148,10 +155,21 @@ class Data_Package():
 class Token:
     def __init__(self, effector_id, time_mark,route:Route,source,content):
         self.effector_id = effector_id
+        self.request_time_mark = 0
         self.route = route
         self.message = Data_Package(time_mark,content,source)
     def set_message(self,content):
         self.message.content = content
+        
+    def set_request_time_mark(self, time_mark):
+        self.request_time_mark = time_mark
+    
+    def copy(self):
+        # Create a shallow copy
+        cls = self.__class__
+        other = cls.__new__(cls)
+        other.__dict__.update(self.__dict__)
+        return other
 
 def main():
     r = Route(1)

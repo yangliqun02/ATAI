@@ -38,11 +38,13 @@ def route_init(my_ao,my_mmlsm:mmlsm, perceptrons, poster_input, poster_output):
     print(route)
     my_ao.router.add_route(effector_id,route)
 
-def rand_route_init(my_mmlsm:mmlsm, effector_id, perceptron_id_list):
+def rand_route_init(my_mmlsm:mmlsm, my_ao, perceptron_id_list):
     #随机初始化route
+    effector_id = my_ao.effector.id
+    print(effector_id)
     route = my_mmlsm.get_random_candidates_routes(effector_id, perceptron_id_list)
-    print(route)
     my_ao.router.add_route(effector_id, route)
+    return my_ao
 
 # Framework 线程
 def executor_thread(task_queue):
@@ -72,9 +74,11 @@ def supervisor_thread(token_queue):
 if __name__ == "__main__":
     print("start machine")
     perceptrons_id_list = [perceptron.id for perceptron in perceptrons]
-    for my_ao in my_aos:
+    for i in range(len(my_aos)):
         perceptron_id_list1 = random.sample(perceptrons_id_list, 2)
-        rand_route_init(my_mmlsm,my_ao.effector.id, perceptron_id_list1)
+        my_aos[i] = rand_route_init(my_mmlsm,my_aos[i],perceptron_id_list1)
+        time_stamp = datetime.datetime.now().timestamp()
+        my_aos[i].run(time_stamp,None)
     
     
     
