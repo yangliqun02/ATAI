@@ -1,7 +1,7 @@
 import numpy as np
-from modular import Modular as mod
-from modular import Modularized_Multiscale_Liquid_State_Machine as mmlsm
-from Token import Token
+from Frame_work.modular import Modular as mod
+from Frame_work.modular import Modularized_Multiscale_Liquid_State_Machine as mmlsm
+from Frame_work.Token import Token
 
 
 class Effector(mod):

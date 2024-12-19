@@ -1,7 +1,8 @@
 import time
 import queue
-from Token import Token, Route
-from modular import Modular as mod
+from Frame_work.Token import Token, Route
+import datetime
+from Frame_work.modular import Modular as mod
 class clock():
     def __init__(self,task_frequence,effector_id):
         self.task_freq = task_frequence
@@ -42,9 +43,11 @@ class artificial_oscillator():
         tk.set_request_time_mark(time_mark)
         return tk
     
-    def run(self, current_time_mark,tk:Token):
+    def run(self,tk:Token):
+        current_time_mark = datetime.datetime.now().timestamp()
         if tk == None:
             new_token = self.create_token(current_time_mark)
+            print('start effect')
             return self.effector.receive_Token(new_token)
         else:
             print(f'get {tk.effector_id}: {tk.message.time_mark} feedback')

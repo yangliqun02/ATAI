@@ -2,13 +2,12 @@ import threading
 import time
 import queue
 import random
-from modular import Modular as mod, Modularized_Multiscale_Liquid_State_Machine as mmlsm
-from Artificial_Oscillator import artificial_oscillator as oscillator
-from Token import Token, Route
-import Main_Algorithm as ma
-from effector import Effector
-from perceptron import Perceptron
-from tools import generate_random_id
+from Frame_work.modular import Modular as mod, Modularized_Multiscale_Liquid_State_Machine as mmlsm
+from Frame_work.Artificial_Oscillator import artificial_oscillator as oscillator
+import Frame_work.Main_Algorithm as ma
+from Frame_work.effector import Effector
+from Frame_work.perceptron import Perceptron
+from Frame_work.tools import generate_random_id
 import datetime
 
 
@@ -69,17 +68,14 @@ def clock_thread(ao: oscillator):
 def supervisor_thread(token_queue):
     time.sleep(5)
     print(token_queue)
+    
+def run_task(ao,task_freq):
+    for i in range(100):
+        time.sleep(1/task_freq)
+        ao.run(None)
 
 # 主程序
-if __name__ == "__main__":
-    print("start machine")
-    perceptrons_id_list = [perceptron.id for perceptron in perceptrons]
-    for i in range(len(my_aos)):
-        perceptron_id_list1 = random.sample(perceptrons_id_list, 2)
-        my_aos[i] = rand_route_init(my_mmlsm,my_aos[i],perceptron_id_list1)
-        time_stamp = datetime.datetime.now().timestamp()
-        my_aos[i].run(time_stamp,None)
-    
+
     
     
 

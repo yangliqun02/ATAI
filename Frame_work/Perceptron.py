@@ -1,5 +1,5 @@
-from Token import Token,Route,Data_Package
-from modular import Modular as mod
+from Frame_work.Token import Token,Route,Data_Package
+from Frame_work.modular import Modular as mod
 class Perceptron(mod):
     def __init__(self, perceptron_id):
         super(Perceptron, self).__init__(perceptron_id)

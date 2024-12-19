@@ -1,5 +1,4 @@
-from Token import Token, Route,Data_Package
-import queue
+from Frame_work.Token import Token, Route,Data_Package
 from queue import PriorityQueue, Queue
 import random
 import datetime
@@ -33,12 +32,12 @@ class Modular:
         self.prev_avail_mod_map = {module.id: module for module in mod_list}
         return
     
-    def add_token_to_queue_map(self, task_queue_map, token: Token):
-        if token.effector_id in task_queue_map:
-            task_queue_map[token.effector_id].put(token)
+    def add_token_to_queue_map(self, tk_queue_map, token: Token):
+        if token.effector_id in tk_queue_map:
+            tk_queue_map[token.effector_id].put(token)
         else:
-            task_queue_map[token.effector_id] = Queue()
-            task_queue_map[token.effector_id].put(token)
+            tk_queue_map[token.effector_id] = Queue()
+            tk_queue_map[token.effector_id].put(token)
         return 
     
     def set_token_to_pre_node_queue(self, node_id, tk: Token):
@@ -50,10 +49,13 @@ class Modular:
         #检查当前是否存在可以直接返回的结果，如果有，检查是否超时，如果未超时，则返回，否则删除该键值
         if tk.effector_id in self.output_list:
             datapackage = self.output_list[tk.effector_id]
+            if len(self.prev_avail_mod_map) == 0:
+                print(f"{tk.effector_id} success!!!")
+                return
             if datapackage.check_fresh(tk.message.time_mark):
                 source_id = tk.message.source
                 request_time_mark = tk.request_time_mark
-                tk = Token(tk.effector_id,self.current_time_mark,Route(tk.message.source),self.id,datapackage.content)
+                tk = Token(tk.effector_id,self.current_time_mark,tk.route,self.id,datapackage.content)
                 tk.set_request_time_mark(request_time_mark)
                 # add result token & notify
                 self.set_token_to_pre_node_queue(source_id, tk)
@@ -62,7 +64,7 @@ class Modular:
             else:
                 del self.output_list[tk.effector_id]
                 for node_id in tk.route.map[self.id]:
-                    new_tk = tk.copy()
+                    new_tk = Token(tk.effector_id,self.current_time_mark,tk.route,self.id,None)
                     new_tk.message.time_mark = self.current_time_mark
                     new_tk.message.source = self.id
                     # add task token & notify
@@ -77,7 +79,7 @@ class Modular:
             datapackage = self.get_percepted_data()
             source_id = tk.message.source
             request_time_mark = tk.request_time_mark
-            tk = Token(tk.effector_id,self.current_time_mark,Route(tk.message.source),self.id,datapackage.content)
+            tk = Token(tk.effector_id,self.current_time_mark,tk.route,self.id,datapackage.content)
             tk.set_request_time_mark(request_time_mark)
             # add result token & notify
             self.set_token_to_pre_node_queue(source_id, tk)
@@ -85,11 +87,10 @@ class Modular:
             return
         else:
             for node_id in tk.route.map[self.id]:
-                new_tk = tk.copy()
+                new_tk = Token(tk.effector_id,self.current_time_mark,tk.route,self.id,None)
                 new_tk.message.time_mark = self.current_time_mark
                 new_tk.message.source = self.id
                 # add task token & notify
-                print("tk: ",new_tk.message.source, node_id, self.next_avail_mod_map[node_id].id)
                 self.add_token_to_queue_map(self.next_avail_mod_map[node_id].task_queue_map, new_tk)
                 self.next_avail_mod_map[node_id].receive_Token(new_tk)
             return
@@ -103,41 +104,40 @@ class Modular:
         get_all_requirements = True
         require_list = {}
         for node_id in tk.route.map[self.id]:
-            index = 0
-            max_int = max(self.compute_queue_map[tk.effector_id][node_id].qsize(), max_qsize)
             get_one = False
-            while index < max_int:
-                node_tk = self.compute_queue_map[tk.effector_id][node_id].get()
-                if node_tk.request_time_mark == tk.request_time_mark:
-                    get_one = True
-                    require_list[node_id] = node_tk
-                    break
-                else:
-                    # put back
-                    self.compute_queue_map[tk.effector_id][node_id].put(node_tk)
-                index += 1
+            if tk.effector_id in self.compute_queue_map[node_id]:
+                index = 0
+                max_int = max(self.compute_queue_map[node_id][tk.effector_id].qsize(), max_qsize)
+                while index < max_int:
+                    node_tk = self.compute_queue_map[node_id][tk.effector_id].get()
+                    if node_tk.request_time_mark == tk.request_time_mark:
+                        get_one = True
+                        require_list[node_id] = node_tk
+                        break
+                    else:
+                        # put back
+                        self.compute_queue_map[node_id][tk.effector_id].put(node_tk)
+                    index += 1
             get_all_requirements = (get_all_requirements and get_one)
         
         if get_all_requirements:
             datapackage = self.compute(require_list)
             self.output_list[tk.effector_id] = datapackage
             # request_time_mark = tk.request_time_mark
+            if len(self.prev_avail_mod_map) == 0:
+                print(f"{tk.effector_id} success!!!")
+                return
             
             index = 0
-            max_int = max(self.task_queue_map[tk.effector_id].qsize(), max_qsize)
             get_one = False
+            max_int = max(self.task_queue_map[tk.effector_id].qsize(), max_qsize)
             while index < max_int:
                 task_tk = self.task_queue_map[tk.effector_id].get()
                 if task_tk.request_time_mark == tk.request_time_mark:
                     get_one = True
-                    if len(self.prev_avail_mod_map) == 0:
-                        print(f"{tk.effector_id} success!!!")
-                        break
                     # trigger second request success
                     new_tk = task_tk.copy()
                     new_tk.message.time_mark = self.current_time_mark
-                    print("self receive")
-                    print(new_tk.message.source, self.id)
                     self.receive_Token(new_tk)
                     break
                 else:
@@ -146,7 +146,7 @@ class Modular:
                 index+=1
         else:
             for id, item in require_list.items():
-                self.compute_queue_map[tk.effector_id][id].put(item)
+                self.compute_queue_map[id][tk.effector_id].put(item)
         return
 
     def receive_Token(self,tk:Token):
