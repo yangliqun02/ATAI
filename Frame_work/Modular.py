@@ -4,6 +4,11 @@ import random
 import datetime
 from itertools import combinations, permutations
 from tqdm import tqdm
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+import networkx as nx
+
+time_frame_plot = []
 
 class Modular:
     def __init__(self, id):
@@ -19,6 +24,7 @@ class Modular:
     def compute(self, dp_list):
         print(f'{self.id} complete computing')
         datapackage = Data_Package(self.current_time_mark,0,self.id)
+        time_frame_plot.append((self.current_time_mark, self.id))
         return datapackage
     
     def set_compute_queue_map(self, node_id):
@@ -173,6 +179,45 @@ class Modularized_Multiscale_Liquid_State_Machine():
 
     def get_modular_id(self,layer_index, branch_index):
         return self.modulars[layer_index*self.layer_num+branch_index].id
+    
+    
+    def plot_network_structure(self, layer_num=3):
+        self.Graph = nx.Graph()
+        self.Node_pos = {}
+        i = 0
+        self.Graph.add_nodes_from(self.effector_id)
+        for node_id in self.effector_id:
+            self.Node_pos[node_id] = (1, i+1)
+            i+=1
+        
+        i = 0
+        self.Graph.add_nodes_from(self.reservior_id)
+        for node_id in self.reservior_id:
+            self.Node_pos[node_id] = (int(i/layer_num)+2, i % layer_num + 1)
+            i+=1
+        
+        i = 0
+        self.Graph.add_nodes_from(self.pertrons_id)
+        for node_id in self.pertrons_id:
+            self.Node_pos[node_id] = (len(self.reservior_id) / layer_num + 2, i+1)
+            i+=1
+            
+        edges = []
+        for nd1 in self.effector_id:
+            for nd2 in self.reservior_id[0:layer_num]:
+                edges.append((nd1, nd2))
+        
+        for layer_inx in range(0, int(len(self.reservior_id) / layer_num)-1):
+            for nd1 in self.reservior_id[layer_inx*layer_num:(layer_inx+1)*layer_num]:
+                for nd2 in self.reservior_id[(layer_inx+1)*layer_num:(layer_inx+2)*layer_num]:
+                    edges.append((nd1, nd2))
+        
+        layer_inx = int(len(self.reservior_id) / layer_num)-1
+        for nd1 in self.reservior_id[layer_inx*layer_num:(layer_inx+1)*layer_num]:
+            for nd2 in self.pertrons_id:
+                edges.append((nd1, nd2))
+        self.Graph.add_edges_from(edges)
+        return self.Graph, self.Node_pos
     
     def set_network_structure(self, layer_num=3):
         self._layer_num = layer_num

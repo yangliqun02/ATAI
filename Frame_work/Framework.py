@@ -19,6 +19,7 @@ reserviors = [mod(generate_random_id()) for i in range(9)]
 perceptrons = [Perceptron(generate_random_id()) for i in range(3)]
 my_mmlsm = mmlsm(effectors, reserviors, perceptrons)
 my_mmlsm.set_network_structure()
+graph_base, node_pos = my_mmlsm.plot_network_structure()
 my_aos = [oscillator(effector, 5) for effector in effectors]
 
 def route_init(my_ao,my_mmlsm:mmlsm, perceptrons, poster_input, poster_output):
@@ -74,7 +75,6 @@ def run_task(ao,task_freq):
         time.sleep(1/task_freq)
         ao.run(None)
 
-# 主程序
 
     
     
