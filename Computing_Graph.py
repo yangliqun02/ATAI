@@ -6,6 +6,8 @@ import queue
 import threading
 from random import shuffle
 from datetime import datetime
+import time
+from collections import OrderedDict
 
 #全局变量统计
 processed_count = 0
@@ -68,41 +70,39 @@ class Model2(nn.Module):
         return self.classifier(x)
 
 # 生产者函数 - 将数据集中的数据封装为 Token 并放入队列
-def producer(data_loader, task_queue, learn_queue, num_producers=2):
+def producer(data_loader, task_queue, learn_dict, num_producers=2):
     product_threads = []
     for _ in range(num_producers):
-        product_threads.append(threading.Thread(target=_producer_thread, args=(data_loader, task_queue, learn_queue,thread_end_condition)))
+        product_threads.append(threading.Thread(target=_producer_thread, args=(data_loader, task_queue, learn_dict,thread_end_condition)))
     for thread in product_threads:
         thread.start()
     return product_threads
-def _producer_thread(data_loader, task_queue, learn_queue,thread_end_func):
-    for inputs, labels in data_loader:  # 忽略标签
-        for idx, input_tensor in enumerate(inputs):
-            timestamp = datetime.now().timestamp()
-            token = Token(id=1, tensor=input_tensor.unsqueeze(0), timestamp=timestamp)  # 添加批次维度
-            task_queue.put(token)
-            learn_queue.put({'id': token.id, 'timestamp': timestamp, 'label': labels[idx]})
-            print('put one sample to the queue')
-            global product_count,processed_count 
-            product_count+=1
-            import time
-            if product_count>1000+processed_count:
-                time.sleep(1)
+def _producer_thread(data_loader, task_queue, learn_dict,thread_end_func):
+    for idx,(input, label) in enumerate(data_loader):  
+        timestamp = datetime.now().timestamp()
+        token = Token(id=1, tensor=input, timestamp=timestamp)
+        task_queue.put(token)
+        learn_dict[timestamp] = label
+        print('put one sample to the queue')
+        global product_count,processed_count 
+        product_count+=1
+        if product_count>1000+processed_count:
+            time.sleep(1)
         # 添加终止条件
         if thread_end_func():
             break
 
 # 消费者函数 - 从队列中提取 Token 进行前向计算
-def consumer(model1, model2, device, task_queue, output_queue, num_consumers=2):
+def consumer(model1, model2, device, task_queue, output_queue,learn_dict, num_consumers=2):
     processed_threads = []
     for _ in range(num_consumers):
-        processed_threads.append(threading.Thread(target=_consumer_thread, args=(model1, model2, device, task_queue, output_queue,thread_end_condition)))
+        processed_threads.append(threading.Thread(target=_consumer_thread, args=(model1, model2, device, task_queue, output_queue,learn_dict,thread_end_condition)))
     
     for thread in processed_threads:
         thread.start()
     return processed_threads
 
-def _consumer_thread(model1, model2, device, task_queue, output_queue,thread_end_func):
+def _consumer_thread(model1, model2, device, task_queue, output_queue,learn_dict,thread_end_func):
     global processed_count
     while True:
         try:
@@ -116,8 +116,11 @@ def _consumer_thread(model1, model2, device, task_queue, output_queue,thread_end
             task_queue.put(token)
         elif token.id == 2:
             outputs = model2(token.tensor.to(device))
-            output_queue.put({'output': outputs, 'timestamp': token.timestamp})
-            print(f'put one output to the output queue')
+            print(f'put one output to the output')
+            if token.timestamp in learn_dict:
+                output_queue.put([outputs,learn_dict[token.timestamp]])
+            else:
+                print('error output without label record')
             processed_count+=1
         #制定退出条件
         # 添加终止条件
@@ -125,48 +128,35 @@ def _consumer_thread(model1, model2, device, task_queue, output_queue,thread_end
             break
 
 # 学习者函数 - 从 output_queue 中提取输出并基于 learn_queue 中的标签进行反向传播
-def learner(model1,model2, device, output_queue, learn_queue,num_learners = 1):
+def learner(model1,model2, device, learn_dict,num_learners = 1):
     learner_threads = []
     for _ in range(num_learners):
         criterion = nn.CrossEntropyLoss()
         optimizer = optim.Adam(list(model1.parameters()) + list(model2.parameters()), lr=0.001)
-        learner_threads.append(threading.Thread(target=_learner_thread, args=(optimizer,criterion, device, output_queue,learn_queue,thread_end_condition)))
+        learner_threads.append(threading.Thread(target=_learner_offline_thread, args=(optimizer,criterion, device, learn_dict,thread_end_condition)))
     
     for thread in learner_threads:
         thread.start()
     return learner_threads
 
-def _learner_thread(optimizer, criterion, device, output_queue, learn_queue,thread_end_func):
+def _learner_offline_thread(optimizer, criterion, device, output_queue,thread_end_func):
+    #离线学习策略:学习标签先于输出产生，且所有输入均会获得反馈
     global skip_count
     global learned_count
     while True:
         try:
-            output_packet = output_queue.get(timeout=1)
-            label_packet = None
-            timer_count = 0
-            # 查找匹配的时间戳,如果没有，则
-            while not label_packet or label_packet['timestamp'] != output_packet['timestamp']:
-                try:
-                    label_packet = learn_queue.get_nowait()
-                    break
-                except queue.Empty:
-                    continue
-            
-            if label_packet and label_packet['timestamp'] == output_packet['timestamp']:
-                target_tensor = label_packet['label'].unsqueeze(0).to(device)
-                
-                optimizer.zero_grad()
-                loss = criterion(output_packet['output'], target_tensor)
-                try:
-                    loss.backward()
-                    learned_count+=1
-                except RuntimeError:
-                    print('skip this training step')
-                    skip_count+=1
-                optimizer.step()
-                print(f"Processed a learning step for timestamp {output_packet['timestamp']}")
-            else:
-                print("No matching label found, discarding output.")
+            #从可学习的标签中拿取一个标签
+            bp_sample = output_queue.get(timeout = 1)
+            optimizer.zero_grad()
+            loss = criterion(bp_sample[0], bp_sample[1].to(device))
+            try:
+                loss.backward()
+                learned_count+=1
+                print('learn task')
+            except RuntimeError:
+                print('skip this training step')
+                skip_count+=1
+            optimizer.step()
         except queue.Empty:
             continue
         #制定退出条件
@@ -187,12 +177,12 @@ def main():
     # 创建任务队列和输出队列
     task_queue = queue.Queue()
     output_queue = queue.Queue()
-    learn_queue = queue.Queue()
+    learn_dict = {}
 
     # 启动生产者、消费者和学习者线程
-    product_threads = producer(trainloader, task_queue, learn_queue)
-    processed_threads = consumer(model1, model2, device, task_queue, output_queue)
-    learner_threads = learner(model1,model2,device,output_queue,learn_queue)
+    product_threads = producer(trainloader, task_queue, learn_dict)
+    processed_threads = consumer(model1, model2, device, task_queue, output_queue,learn_dict)
+    learner_threads = learner(model1,model2,device,output_queue)
 
     for thread in processed_threads:
             thread.join()
