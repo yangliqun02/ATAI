@@ -1,48 +1,95 @@
-import networkx as nx
-import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
-import matplotlib.animation
+import matplotlib.animation as animation
+import networkx as nx
+import random
 
-# Create Graph
-np.random.seed(2)
-G = nx.cubical_graph()
-G = nx.relabel_nodes(G, {0:"O", 1:"X", 2:"XZ", 3:"Z", 4:"Y", 5:"YZ", 6: "XYZ", 7:"XY"})
-pos = nx.spring_layout(G)
+# Create a new directed graph
+G = nx.Graph()
 
-# Sequence of letters
-sequence_of_letters = "".join(['X', 'Y', 'Z', 'Y', 'Y', 'Z'])
-idx_colors = sns.cubehelix_palette(5, start=.5, rot=-.75)[::-1]
-idx_weights = [3,2,1]
+# Add nodes (neurons)
+layer1 = ["A", "B", "C"]
+layer2 = ["D", "E", "F"]
+layer3 = ["G", "H", "I"]
+G.add_nodes_from(layer1)
+G.add_nodes_from(layer2)
+G.add_nodes_from(layer3)
+pos = {}
+i = 0
+for node in layer1:
+    pos[node] = (int(i/3)+1, i % 3 + 1)
+    i+=1
 
-# Build plot
-fig, ax = plt.subplots(figsize=(6,4))
+for node in layer2:
+    pos[node] = (int(i/3)+1, i % 3 + 1)
+    i+=1
+    
+for node in layer3:
+    pos[node] = (int(i/3)+1, i % 3 + 1)
+    i+=1
 
+# Add edges (connections between neurons)
+edges = []
 
-def update(num):
-    ax.clear()
-    i = num // 3
-    j = num % 3 + 1
-    triad = sequence_of_letters[i:i+3]
-    path = ["O"] + ["".join(sorted(set(triad[:k + 1]))) for k in range(j)]
+for node1  in layer1:
+    for node2 in layer2:
+        edges.append((node1, node2))
 
-    # Background nodes
-    nx.draw_networkx_edges(G, pos=pos, ax=ax, edge_color="gray")
-    null_nodes = nx.draw_networkx_nodes(G, pos=pos, nodelist=set(G.nodes()) - set(path), node_color="white",  ax=ax)
-    null_nodes.set_edgecolor("black")
+for node1  in layer2:
+    for node2 in layer3:
+        edges.append((node1, node2))
+G.add_edges_from(edges)
 
-    # Query nodes
-    query_nodes = nx.draw_networkx_nodes(G, pos=pos, nodelist=path, node_color=idx_colors[:len(path)], ax=ax)
-    query_nodes.set_edgecolor("white")
-    nx.draw_networkx_labels(G, pos=pos, labels=dict(zip(path,path)),  font_color="white", ax=ax)
-    edgelist = [path[k:k+2] for k in range(len(path) - 1)]
-    nx.draw_networkx_edges(G, pos=pos, edgelist=edgelist, width=idx_weights[:len(path)], ax=ax)
+# Position the nodes
 
-    # Scale plot ax
-    ax.set_title("Frame %d:    "%(num+1) +  " - ".join(path), fontweight="bold")
-    ax.set_xticks([])
-    ax.set_yticks([])
+# Create the figure and axis
+fig, ax = plt.subplots()
 
+# Draw the static graph
+nx.draw(G, pos, with_labels=True, node_color='lightblue', edge_color='gray', ax=ax)
 
-ani = matplotlib.animation.FuncAnimation(fig, update, frames=6, interval=1000, repeat=True)
+total_list = []
+# Animation function
+def animate(frame):
+    # This function will be called for each frame of the animation
+    ax.clear()  # Clear the previous frame
+    nx.draw(G, pos, with_labels=True, node_color='lightblue', edge_color='gray', ax=ax)
+    
+    # Highlight a node or edge for each frame
+    index = frame % 6
+    
+    # print(index)
+    if index == 0:
+        nodes_to_highlight = random.choices(layer1,k=2)
+        total_list.append(nodes_to_highlight)
+    if index == 1:
+        nodes_to_highlight = random.choices(layer2,k=2)
+        total_list.append(nodes_to_highlight)
+    if index == 2:
+        nodes_to_highlight = random.choices(layer3,k=2)
+        total_list.append(nodes_to_highlight)
+    if index == 3:
+        nodes_to_highlight = total_list.pop()
+    if index == 4:
+        nodes_to_highlight = total_list.pop()
+    if index == 5:
+        nodes_to_highlight = total_list.pop()
+    
+    edge_to_highlight = edges[frame % len(edges)]
+    
+    # Update node colors
+    node_colors = ['lightblue' if node not in nodes_to_highlight else 'red' for node in G.nodes()]
+    # print(node_colors)
+    # Update edge colors
+    edge_colors = ['gray' if edge != edge_to_highlight else 'red' for edge in G.edges()]
+    
+    # Draw the graph with updated colors
+    nx.draw(G, pos, with_labels=True, node_color=node_colors, edge_color=edge_colors, ax=ax)
+    
+    # Set title to show current highlighted node/edge
+    # ax.set_title(f"Node: {node_to_highlight}, Edge: {edge_to_highlight}")
+
+# Create the animation
+ani = animation.FuncAnimation(fig, animate, frames=32, interval=500)
+ani.save('animation.gif', writer='imagemagick')
+# Show the animation
 plt.show()

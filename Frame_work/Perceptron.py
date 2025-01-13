@@ -1,5 +1,6 @@
 from Frame_work.Token import Token,Route,Data_Package
 from Frame_work.modular import Modular as mod
+import torch
 class Perceptron(mod):
     def __init__(self, perceptron_id):
         super(Perceptron, self).__init__(perceptron_id)
@@ -28,5 +29,10 @@ class Perceptron(mod):
     
     def get_percepted_data(self):
         print(f'{self.id} reach end')
-        return Data_Package(self.current_time_mark, f"perception {self.id}", self.id)
+        h = 4
+        x = 3
+        y = 256
+        z = 256
+        random_image = torch.randn(h, x, y, z)
+        return Data_Package(self.current_time_mark, random_image, self.id)
     

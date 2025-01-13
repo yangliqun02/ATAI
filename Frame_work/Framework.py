@@ -8,14 +8,22 @@ import Frame_work.Main_Algorithm as ma
 from Frame_work.effector import Effector
 from Frame_work.perceptron import Perceptron
 from Frame_work.tools import generate_random_id
+from Frame_work.models import NaturalSceneClassificationBase,Model1Classification,Model2Classification
 import datetime
 
 
 # 框架内定义全局所需的变量以及各种全局函数
 # 包括路径初始化，路径优化函数
+base_model = NaturalSceneClassificationBase()
+model1 = Model1Classification()
+model2 = Model2Classification()
+
 token_queue = queue.Queue()
-effectors = [Effector(generate_random_id()) for i in range(3)]
-reserviors = [mod(generate_random_id()) for i in range(9)]
+effectors = [Effector(generate_random_id()) for i in range(2)]
+effectors[0].set_model(model1)
+effectors[1].set_model(model2)
+reserviors = [mod(i) for i in range(1)]
+reserviors[0].set_model(base_model)
 perceptrons = [Perceptron(generate_random_id()) for i in range(3)]
 my_mmlsm = mmlsm(effectors, reserviors, perceptrons)
 my_mmlsm.set_network_structure()

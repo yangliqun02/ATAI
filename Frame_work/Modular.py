@@ -7,6 +7,7 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import networkx as nx
+import torch
 
 time_frame_plot = []
 
@@ -22,10 +23,28 @@ class Modular:
         self.compute_queue_map = {}
     
     def compute(self, dp_list):
-        print(f'{self.id} complete computing')
-        datapackage = Data_Package(self.current_time_mark,0,self.id)
+        result_list = {}
+
+        for key, value in dp_list.items():
+            print(value.message.content.shape)
+            result_list[key] = self._model(value.message.content)
+        
+        datapackage = Data_Package(self.current_time_mark,result_list,self.id)
         time_frame_plot.append((self.current_time_mark, self.id))
+        print(f'{self.id} complete computing')
         return datapackage
+    
+    def set_model(self, model):
+        self._model = model
+        
+    def get_percepted_data(self):
+        print(f'{self.id} reach end')
+        h = 4
+        x = 3
+        y = 256
+        z = 256
+        random_image = torch.randn(h, x, y, z)
+        return Data_Package(self.current_time_mark, random_image, self.id)
     
     def set_compute_queue_map(self, node_id):
         self.compute_queue_map[node_id] = {}
@@ -181,7 +200,7 @@ class Modularized_Multiscale_Liquid_State_Machine():
         return self.modulars[layer_index*self.layer_num+branch_index].id
     
     
-    def plot_network_structure(self, layer_num=3):
+    def plot_network_structure(self, layer_num=1):
         self.Graph = nx.Graph()
         self.Node_pos = {}
         i = 0
@@ -219,7 +238,7 @@ class Modularized_Multiscale_Liquid_State_Machine():
         self.Graph.add_edges_from(edges)
         return self.Graph, self.Node_pos
     
-    def set_network_structure(self, layer_num=3):
+    def set_network_structure(self, layer_num=1):
         self._layer_num = layer_num
         self._layer_id_map = {}
         offset = 0
@@ -271,7 +290,7 @@ class Modularized_Multiscale_Liquid_State_Machine():
                 return False
         return True
     
-    def get_random_candidates_routes(self, root_nood_id, leaf_nood_id_list, sample_count=2):
+    def get_random_candidates_routes(self, root_nood_id, leaf_nood_id_list, sample_count=1):
         if not self.has_modular(root_nood_id):
             raise ValueError("Root node must be in the list of nodes.")
         if not self.has_modulars(leaf_nood_id_list):

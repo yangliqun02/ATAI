@@ -68,7 +68,7 @@ if __name__ == "__main__":
     executor_thread_1.join()
     executor_thread_2.join()
     # Create the animation
-    frame_dict = to_time_frame_list(resolution=10)
+    frame_dict = to_time_frame_list(resolution=1000)
     print(frame_dict)
     ani = animation.FuncAnimation(fig, animate, frames=len(frame_dict), interval=100)
     ani.save('animation.gif', writer='imagemagick')
