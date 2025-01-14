@@ -22,9 +22,9 @@ token_queue = queue.Queue()
 effectors = [Effector(generate_random_id()) for i in range(2)]
 effectors[0].set_model(model1)
 effectors[1].set_model(model2)
-reserviors = [mod(i) for i in range(1)]
+reserviors = [mod(str(i)) for i in range(1)]
 reserviors[0].set_model(base_model)
-perceptrons = [Perceptron(generate_random_id()) for i in range(3)]
+perceptrons = [Perceptron("percept"+generate_random_id()) for i in range(3)]
 my_mmlsm = mmlsm(effectors, reserviors, perceptrons)
 my_mmlsm.set_network_structure()
 graph_base, node_pos = my_mmlsm.plot_network_structure()

@@ -27,7 +27,11 @@ class Perceptron(mod):
         super(Perceptron, self).set_prev_avail_mod_list(mod_list)
         return 
     
+    def receive_request(self,tk:Token):
+        super(Perceptron, self).receive_request(tk)
+    
     def get_percepted_data(self):
+        # super(Perceptron, self).get_percepted_data()
         print(f'{self.id} reach end')
         h = 4
         x = 3

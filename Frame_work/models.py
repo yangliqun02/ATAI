@@ -25,7 +25,7 @@ class NaturalSceneClassificationBase(nn.Module):
             
             nn.Flatten(),
             nn.ReLU(),
-            nn.Linear(262144,256)
+            nn.Linear(262144,128)
         )
     
     def forward(self, xb):
@@ -35,7 +35,7 @@ class Model1Classification(nn.Module):
     def __init__(self):
         super().__init__()
         self.network = nn.Sequential(
-            nn.Linear(256,9),
+            nn.Linear(128,9),
             nn.Softmax(dim=1)
         )
     
@@ -47,7 +47,7 @@ class Model2Classification(nn.Module):
     def __init__(self):
         super().__init__()
         self.network = nn.Sequential(
-            nn.Linear(256,32),
+            nn.Linear(128,32),
             nn.Softmax(dim=1)
         )
     

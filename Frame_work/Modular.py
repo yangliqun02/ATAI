@@ -26,7 +26,6 @@ class Modular:
         result_list = {}
 
         for key, value in dp_list.items():
-            print(value.message.content.shape)
             result_list[key] = self._model(value.message.content)
         
         datapackage = Data_Package(self.current_time_mark,result_list,self.id)
@@ -37,14 +36,8 @@ class Modular:
     def set_model(self, model):
         self._model = model
         
-    def get_percepted_data(self):
-        print(f'{self.id} reach end')
-        h = 4
-        x = 3
-        y = 256
-        z = 256
-        random_image = torch.randn(h, x, y, z)
-        return Data_Package(self.current_time_mark, random_image, self.id)
+    # def get_percepted_data(self):
+    #     return Data_Package(self.current_time_mark, 0, self.id)
     
     def set_compute_queue_map(self, node_id):
         self.compute_queue_map[node_id] = {}
@@ -101,7 +94,7 @@ class Modular:
         #首先从tk路线图获取当前请求的子节点信息，包含子节点id以及子节点子路由图
         #创建等待数据包，
         #创建请求令牌
-        elif len(self.next_avail_mod_map) == 0:
+        elif self.id.startswith("percept"):
             datapackage = self.get_percepted_data()
             source_id = tk.message.source
             request_time_mark = tk.request_time_mark
@@ -256,7 +249,7 @@ class Modularized_Multiscale_Liquid_State_Machine():
                     self.reserviors[offset:offset+layer_size][j].set_next_avail_mod_list(self.reserviors[next_offset:next_offset+layer_size])
                     for node_id in self.reservior_id[next_offset:next_offset+layer_size]:
                         self.reserviors[offset:offset+layer_size][j].set_compute_queue_map(node_id)
-            elif i == layer_num - 1:
+            if i == layer_num - 1:
                 for j in range(len(self.reserviors[offset:offset+layer_size])):
                     prev_offset = offset-layer_size
                     self.reserviors[offset:offset+layer_size][j].set_prev_avail_mod_list(self.reserviors[prev_offset:prev_offset+layer_size])
