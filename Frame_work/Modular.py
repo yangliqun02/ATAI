@@ -1,6 +1,8 @@
 from Frame_work.Token import Token, Route,Data_Package
 from queue import PriorityQueue, Queue
 import random
+import torch.nn as nn
+import torch.optim as optim
 import datetime
 from itertools import combinations, permutations
 from tqdm import tqdm
@@ -10,6 +12,7 @@ import networkx as nx
 import torch
 
 time_frame_plot = []
+
 
 class Modular:
     def __init__(self, id):
@@ -35,12 +38,24 @@ class Modular:
     
     def set_model(self, model):
         self._model = model
+    
+    def get_model(self):
+        return self._model
+    
+    def has_model(self):
+        if self._model:
+            return True
+        else:
+            return False
         
     # def get_percepted_data(self):
     #     return Data_Package(self.current_time_mark, 0, self.id)
     
     def set_compute_queue_map(self, node_id):
         self.compute_queue_map[node_id] = {}
+        
+    def backwards(self):
+        return 
     
     def set_next_avail_mod_list(self, mod_list):
         self.next_avail_mod_map = {module.id: module for module in mod_list}
@@ -143,8 +158,9 @@ class Modular:
             datapackage = self.compute(require_list)
             self.output_list[tk.effector_id] = datapackage
             # request_time_mark = tk.request_time_mark
-            if len(self.prev_avail_mod_map) == 0:
+            if self.id.startswith("effect") == 0:
                 print(f"{tk.effector_id} success!!!")
+                
                 return
             
             index = 0
@@ -188,10 +204,46 @@ class Modularized_Multiscale_Liquid_State_Machine():
         self.effectors = effectors
         self.reserviors = reserviors
         self.pertrons = pertrons
+        self.criterion = nn.CrossEntropyLoss()
+        self.optimizers = dict()
 
+    def learn_models(self, effector_id, pred_y, y):
+        self.optimizers[effector_id].zero_grad()
+        loss = self.criterion(pred_y, y)
+        try:
+            loss.backward()
+            learned_count+=1
+            print('learn task')
+        except RuntimeError:
+            print('skip this training step')
+            skip_count+=1
+        self.optimizers[effector_id].step()
+        return
+    
+    def set_optimizer(self, effector_id, route):
+        all_nodes = set()
+        for node_id, id_list in route.map.items():
+            all_nodes.add(node_id)
+            for id in id_list:
+                all_nodes.add(id)
+        
+        list_weights = []
+        for effector in self.effectors:
+            if effector.id in all_nodes:
+                if effector.has_model():
+                    list_weights += effector.get_model().parameters()
+        for reservior in self.reserviors:
+            if reservior.id in all_nodes:
+                if reservior.has_model():
+                    list_weights += reservior.get_model().parameters()
+        for pertron in self.pertrons:
+            if pertron.id in all_nodes:
+                if pertron.has_model():
+                    list_weights += pertron.get_model().parameters()
+        self.optimizers[effector_id] = optim.Adam(list_weights, lr=0.001)
+        
     def get_modular_id(self,layer_index, branch_index):
         return self.modulars[layer_index*self.layer_num+branch_index].id
-    
     
     def plot_network_structure(self, layer_num=1):
         self.Graph = nx.Graph()

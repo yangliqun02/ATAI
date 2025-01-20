@@ -19,7 +19,7 @@ model1 = Model1Classification()
 model2 = Model2Classification()
 
 token_queue = queue.Queue()
-effectors = [Effector(generate_random_id()) for i in range(2)]
+effectors = [Effector("effect"+generate_random_id()) for i in range(2)]
 effectors[0].set_model(model1)
 effectors[1].set_model(model2)
 reserviors = [mod(str(i)) for i in range(1)]
