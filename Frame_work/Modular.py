@@ -5,17 +5,19 @@ from itertools import combinations, permutations
 from tqdm import tqdm
 
 class Modular:
-    def __init__(self, id):
+    def __init__(self, id, network):
         self.id = id
         self.require_list = {}
         self.output_list = {}
         self.current_time_mark = 0
         self.prev_avail_mod_list = []
         self.next_avail_mod_list = []
+        self.networks = network
     
     def compute(self,dp_list):
         print(f'{self.id} complete computing')
-        datapackage = Data_Package(self.current_time_mark,0,self.id)
+        output = self.network(dp_list)
+        datapackage = Data_Package(self.current_time_mark,output,self.id)
         
         return datapackage
     
