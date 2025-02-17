@@ -28,8 +28,8 @@ class Modular:
     def compute(self, dp_list):
         result_list = {}
 
-        for key, value in dp_list.items():
-            result_list[key] = self._model(value.message.content)
+        # for key, value in dp_list.items():
+        #     result_list[key] = self._model(value.message.content)
         
         datapackage = Data_Package(self.current_time_mark,result_list,self.id)
         time_frame_plot.append((self.current_time_mark, self.id))
@@ -245,7 +245,7 @@ class Modularized_Multiscale_Liquid_State_Machine():
     def get_modular_id(self,layer_index, branch_index):
         return self.modulars[layer_index*self.layer_num+branch_index].id
     
-    def plot_network_structure(self, layer_num=1):
+    def plot_network_structure(self, layer_num=3):
         self.Graph = nx.Graph()
         self.Node_pos = {}
         i = 0
@@ -283,7 +283,7 @@ class Modularized_Multiscale_Liquid_State_Machine():
         self.Graph.add_edges_from(edges)
         return self.Graph, self.Node_pos
     
-    def set_network_structure(self, layer_num=1):
+    def set_network_structure(self, layer_num=3):
         self._layer_num = layer_num
         self._layer_id_map = {}
         offset = 0
@@ -335,7 +335,7 @@ class Modularized_Multiscale_Liquid_State_Machine():
                 return False
         return True
     
-    def get_random_candidates_routes(self, root_nood_id, leaf_nood_id_list, sample_count=1):
+    def get_random_candidates_routes(self, root_nood_id, leaf_nood_id_list, sample_count=2):
         if not self.has_modular(root_nood_id):
             raise ValueError("Root node must be in the list of nodes.")
         if not self.has_modulars(leaf_nood_id_list):

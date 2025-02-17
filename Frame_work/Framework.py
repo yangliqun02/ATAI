@@ -19,11 +19,11 @@ model1 = Model1Classification()
 model2 = Model2Classification()
 
 token_queue = queue.Queue()
-effectors = [Effector("effect"+generate_random_id()) for i in range(2)]
-effectors[0].set_model(model1)
-effectors[1].set_model(model2)
-reserviors = [mod(str(i)) for i in range(1)]
-reserviors[0].set_model(base_model)
+effectors = [Effector("effect"+generate_random_id()) for i in range(3)]
+# effectors[0].set_model(model1)
+# effectors[1].set_model(model2)
+reserviors = [mod(str(i)) for i in range(6)]
+# reserviors[0].set_model(base_model)
 perceptrons = [Perceptron("percept"+generate_random_id()) for i in range(3)]
 my_mmlsm = mmlsm(effectors, reserviors, perceptrons)
 my_mmlsm.set_network_structure()

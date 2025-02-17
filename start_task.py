@@ -59,7 +59,7 @@ if __name__ == "__main__":
     for i in range(len(my_aos)):
         perceptron_id_list1 = random.sample(perceptrons_id_list, 2)
         my_aos[i] = rand_route_init(my_mmlsm,my_aos[i],perceptron_id_list1)
-        my_mmlsm.set_optimizer(my_aos[i].effector.id, my_aos[i].router.get_route(my_aos[i].effector.id))
+        # my_mmlsm.set_optimizer(my_aos[i].effector.id, my_aos[i].router.get_route(my_aos[i].effector.id))
     
     
     executor_thread_1 = threading.Thread(target=run_task, args=(my_aos[0],10))
