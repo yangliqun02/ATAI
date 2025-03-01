@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import networkx as nx
 import torch
+import math
 
 time_frame_plot = []
 
@@ -25,15 +26,17 @@ class Modular:
         self.task_queue_map = {}
         self.compute_queue_map = {}
     
-    def compute(self, dp_list):
+    def compute(self, dp_list, op="concat"):
         result_list = {}
-
-        # for key, value in dp_list.items():
-        #     result_list[key] = self._model(value.message.content)
+        for key, value in dp_list.items():
+            a = None
+            for k, v in value.message.content.items():
+                a = self._model(v)
+            result_list[key] = a
         
         datapackage = Data_Package(self.current_time_mark,result_list,self.id)
         time_frame_plot.append((self.current_time_mark, self.id))
-        print(f'{self.id} complete computing')
+        # print(f'{self.id} complete computing')
         return datapackage
     
     def set_model(self, model):
@@ -92,10 +95,10 @@ class Modular:
                 self.prev_avail_mod_map[source_id].receive_Token(tk)
                 return
             elif datapackage.check_fresh(tk.message.time_mark) and len(self.prev_avail_mod_map) == 0:
-                print(f"{tk.effector_id} success!!!")
+                # print(f"{tk.effector_id} success!!!")
                 return
             else:
-                print("delete!!!")
+                # print("delete!!!")
                 del self.output_list[tk.effector_id]
                 for node_id in tk.route.map[self.id]:
                     new_tk = Token(tk.effector_id,self.current_time_mark,tk.route,self.id,None)
@@ -245,9 +248,10 @@ class Modularized_Multiscale_Liquid_State_Machine():
     def get_modular_id(self,layer_index, branch_index):
         return self.modulars[layer_index*self.layer_num+branch_index].id
     
-    def plot_network_structure(self, layer_num=3):
+    def plot_network_structure(self, layer_num=2):
         self.Graph = nx.Graph()
         self.Node_pos = {}
+        layer_size = math.ceil(float(len(self.reserviors)) / float(layer_num))
         i = 0
         self.Graph.add_nodes_from(self.effector_id)
         for node_id in self.effector_id:
@@ -268,26 +272,26 @@ class Modularized_Multiscale_Liquid_State_Machine():
             
         edges = []
         for nd1 in self.effector_id:
-            for nd2 in self.reservior_id[0:layer_num]:
+            for nd2 in self.reservior_id[0:layer_size]:
                 edges.append((nd1, nd2))
         
-        for layer_inx in range(0, int(len(self.reservior_id) / layer_num)-1):
-            for nd1 in self.reservior_id[layer_inx*layer_num:(layer_inx+1)*layer_num]:
-                for nd2 in self.reservior_id[(layer_inx+1)*layer_num:(layer_inx+2)*layer_num]:
+        for layer_inx in range(0, layer_num-1):
+            for nd1 in self.reservior_id[layer_inx*layer_size:(layer_inx+1)*layer_size]:
+                for nd2 in self.reservior_id[(layer_inx+1)*layer_size:(layer_inx+2)*layer_size]:
                     edges.append((nd1, nd2))
         
         layer_inx = int(len(self.reservior_id) / layer_num)-1
-        for nd1 in self.reservior_id[layer_inx*layer_num:(layer_inx+1)*layer_num]:
+        for nd1 in self.reservior_id[(layer_inx+1)*layer_size:(layer_inx+2)*layer_size]:
             for nd2 in self.pertrons_id:
                 edges.append((nd1, nd2))
         self.Graph.add_edges_from(edges)
         return self.Graph, self.Node_pos
     
-    def set_network_structure(self, layer_num=3):
+    def set_network_structure(self, layer_num=2):
         self._layer_num = layer_num
         self._layer_id_map = {}
         offset = 0
-        layer_size = int(len(self.reserviors) / layer_num)
+        layer_size = math.ceil(float(len(self.reserviors)) / float(layer_num))
         for i in range(len(self.effectors)):
             self.effectors[i].set_next_avail_mod_list(self.reserviors[offset:offset+layer_size])
             for node_id in self.reservior_id[offset:offset+layer_size]:
@@ -319,7 +323,6 @@ class Modularized_Multiscale_Liquid_State_Machine():
             
             self._layer_id_map[i] = self.reservior_id[offset:offset+layer_size]
             offset += layer_size
-        print(self._layer_id_map)
         for i in range(len(self.pertrons)):
             self.pertrons[i].set_prev_avail_mod_list(self.reserviors[offset-layer_size:offset])
     
@@ -335,7 +338,45 @@ class Modularized_Multiscale_Liquid_State_Machine():
                 return False
         return True
     
-    def get_random_candidates_routes(self, root_nood_id, leaf_nood_id_list, sample_count=2):
+    def get_set_routes(self, root_nood_id, leaf_nood_id, middle_route):
+        """_summary_
+
+        Args:
+            root_nood_id (str): effectsds1s123
+            leaf_nood_id (str): percept123321sd1
+            middle_route (list[list]): [[0],[2]] , [[0], [1]]
+        """
+        if not self.has_modular(root_nood_id):
+            raise ValueError("Root node must be in the list of nodes.")
+        if not self.has_modular(leaf_nood_id):
+            raise ValueError("leaf node must be in the list of nodes.")
+        route = Route(root_nood_id)
+        previous_layer = []
+        layer_index = 0
+        layer_num = len(middle_route)
+        
+        while layer_index < layer_num:
+            current_layer = set()
+            if layer_index == 0:
+                sampled_nodes = middle_route[layer_index]
+                for node_id in sampled_nodes:
+                    route.add_link(root_nood_id, node_id)
+                    current_layer.add(node_id)
+            else:
+                for pre_node_id in previous_layer:
+                    sampled_nodes = middle_route[layer_index]
+                    for node_id in sampled_nodes:
+                        route.add_link(pre_node_id, node_id)
+                        current_layer.add(node_id)
+            layer_index+=1
+            previous_layer=list(current_layer)
+        
+        for node_id in previous_layer:
+            route.add_link(node_id, leaf_nood_id)
+        return route
+        
+    
+    def get_random_candidates_routes(self, root_nood_id, leaf_nood_id_list, sample_count=1):
         if not self.has_modular(root_nood_id):
             raise ValueError("Root node must be in the list of nodes.")
         if not self.has_modulars(leaf_nood_id_list):
@@ -348,6 +389,7 @@ class Modularized_Multiscale_Liquid_State_Machine():
         while layer_index < self._layer_num:
             current_layer = set()
             if layer_index == 0:
+                print(self._layer_id_map[layer_index])
                 sampled_nodes = random.sample(self._layer_id_map[layer_index], sample_count)
                 for node_id in sampled_nodes:
                     route.add_link(root_nood_id, node_id)
@@ -419,7 +461,7 @@ class Modularized_Multiscale_Liquid_State_Machine():
                             print('it is a test solution')
                             import random
                             return random.sample(all_subgraphs,2)
-        print('get all candidates')
+        # print('get all candidates')
         return all_subgraphs
     
     def connect_nodes_to_leaf(route, node_list):

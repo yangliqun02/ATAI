@@ -12,23 +12,6 @@ from Frame_work.models import NaturalSceneClassificationBase,Model1Classificatio
 import datetime
 
 
-# 框架内定义全局所需的变量以及各种全局函数
-# 包括路径初始化，路径优化函数
-base_model = NaturalSceneClassificationBase()
-model1 = Model1Classification()
-model2 = Model2Classification()
-
-token_queue = queue.Queue()
-effectors = [Effector("effect"+generate_random_id()) for i in range(3)]
-# effectors[0].set_model(model1)
-# effectors[1].set_model(model2)
-reserviors = [mod(str(i)) for i in range(6)]
-# reserviors[0].set_model(base_model)
-perceptrons = [Perceptron("percept"+generate_random_id()) for i in range(3)]
-my_mmlsm = mmlsm(effectors, reserviors, perceptrons)
-my_mmlsm.set_network_structure()
-graph_base, node_pos = my_mmlsm.plot_network_structure()
-my_aos = [oscillator(effector, 5) for effector in effectors]
 
 def route_init(my_ao,my_mmlsm:mmlsm, perceptrons, poster_input, poster_output):
     #对于每一个任务，从modulars中寻找基于ma距离最近的modular，将其接入路线图

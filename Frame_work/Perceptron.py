@@ -33,10 +33,10 @@ class Perceptron(mod):
     def get_percepted_data(self):
         # super(Perceptron, self).get_percepted_data()
         print(f'{self.id} reach end')
-        h = 4
+        h = 9
         x = 3
         y = 256
         z = 256
         random_image = torch.randn(h, x, y, z)
-        return Data_Package(self.current_time_mark, random_image, self.id)
+        return Data_Package(self.current_time_mark, {self.id: random_image}, self.id)
     
